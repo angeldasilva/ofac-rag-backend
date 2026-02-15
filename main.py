@@ -63,7 +63,7 @@ def root():
 def ask_question(data: Question):
     results = collection.query(
         query_texts=[data.question],
-        n_results=5
+        n_results=8
     )
 
     retrieved_docs = results["documents"][0]
@@ -75,7 +75,7 @@ def ask_question(data: Question):
         messages=[
             {
                 "role": "system",
-                "content": "You are a legal compliance assistant specialized in OFAC sanctions. Answer only using the provided context. If the answer is not in the context, say you cannot determine it."
+                "content": "You are a legal compliance assistant specialized in OFAC sanctions. Use the provided context to interpret and analyze the question. You may synthesize information across multiple documents. If the context provides relevant regulatory provisions, apply them logically. If the context truly does not contain relevant information, say so. Do not rely on external knowledge. Base your reasoning strictly on the provided documents."
             },
             {
                 "role": "user",
