@@ -144,7 +144,7 @@ Now provide:
     final_response = client.chat.completions.create(
         model="gpt-5.2-chat-latest",
         messages=[
-            {"role": "system", "content": ""Provide structured, conservative compliance analysis."},
+            {"role": "system", "content": "Provide structured, conservative compliance analysis."},
             {"role": "user", "content": final_prompt}
         ]
     )
