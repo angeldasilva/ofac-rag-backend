@@ -61,27 +61,82 @@ def root():
 
 @app.post("/ask")
 def ask_question(data: Question):
+
+    # --- STEP 1: RETRIEVAL ---
     results = collection.query(
         query_texts=[data.question],
-        n_results=8
+        n_results=10
     )
 
     retrieved_docs = results["documents"][0]
+    retrieved_meta = results["metadatas"][0]
 
-    context = "\n\n".join(retrieved_docs)
+    context_blocks = []
+    for doc, meta in zip(retrieved_docs, retrieved_meta):
+        context_blocks.append(
+            f"[Source: {meta.get('filename','')} | "
+            f"Type: {meta.get('document_type','')} | "
+            f"Date: {meta.get('date','')}]\n{doc}"
+        )
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
+    context = "\n\n".join(context_blocks)
+
+    # --- STEP 2: STRUCTURED EXTRACTION ---
+    extraction_prompt = f"""
+You are a senior OFAC sanctions analyst.
+
+From the provided regulatory context:
+
+1. Identify relevant regulatory provisions.
+2. Summarize what they permit or prohibit.
+3. Identify conditions, limitations, or expiration clauses.
+4. Extract only legally relevant elements.
+
+Context:
+{context}
+
+Question:
+{data.question}
+"""
+
+    extraction = client.chat.completions.create(
+        model="gpt-5.2-chat-latest",
         messages=[
-            {
-                "role": "system",
-                "content": "You are a legal compliance analyst specialized in OFAC sanctions. Use the provided context as the primary authoritative source. You may apply legal reasoning and interpret regulatory provisions logically. If relevant provisions exist in the context, analyze them and explain how they apply. If the context is insufficient, you may provide general regulatory reasoning but clearly state when you are extrapolating. Do not fabricate specific license permissions that are not supported by the context."
-            },
-            {
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion:\n{data.question}"
-            }
+            {"role": "system", "content": "Extract structured regulatory elements only."},
+            {"role": "user", "content": extraction_prompt}
         ]
     )
 
-    return {"answer": response.choices[0].message.content}
+    structured_analysis = extraction.choices[0].message.content
+
+    # --- STEP 3: LEGAL APPLICATION ---
+    final_prompt = f"""
+You are a senior compliance advisor specialized in OFAC sanctions.
+
+Using ONLY the structured regulatory analysis below:
+
+{structured_analysis}
+
+Now:
+
+1. Apply the regulatory provisions to the specific question.
+2. Provide a clear legal conclusion.
+3. State conditions or uncertainties.
+4. Cite the document sources explicitly.
+5. Do not invent permissions not supported by the analysis.
+
+Question:
+{data.question}
+"""
+
+    final_response = client.chat.completions.create(
+        model="gpt-5.2-chat-latest",
+        messages=[
+            {"role": "system", "content": "Provide structured legal analysis with explicit citations."},
+            {"role": "user", "content": final_prompt}
+        ]
+    )
+
+    return {
+        "answer": final_response.choices[0].message.content
+    }
