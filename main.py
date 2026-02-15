@@ -82,15 +82,10 @@ def ask_question(data: Question):
     context = "\n\n".join(context_blocks)
 
     # --- STEP 2: STRUCTURED EXTRACTION ---
-    extraction_prompt = f"""
-You are a senior OFAC sanctions analyst.
-
-From the provided regulatory context:
-
-1. Identify relevant regulatory provisions.
-2. Summarize what they permit or prohibit.
-3. Identify conditions, limitations, or expiration clauses.
-4. Extract only legally relevant elements.
+extraction_prompt = f"""
+Extract only the regulatory elements directly relevant to answering the question.
+Do not summarize entire documents.
+Identify only provisions that materially affect compliance risk.
 
 Context:
 {context}
@@ -98,6 +93,7 @@ Context:
 Question:
 {data.question}
 """
+
 
     extraction = client.chat.completions.create(
         model="gpt-5.2-chat-latest",
@@ -111,7 +107,27 @@ Question:
 
     # --- STEP 3: LEGAL APPLICATION ---
     final_prompt = f"""
-You are a senior compliance advisor specialized in OFAC sanctions.
+You are a senior compliance advisor specialized in OFAC sanctions and U.S. regulatory risk.
+
+Your role is to provide conservative, compliance-first legal analysis.
+
+Important principles:
+
+- The objective is strict compliance with U.S. law.
+- No recommendation should expose the company to primary or secondary sanctions.
+- If any regulatory ambiguity or sanctions risk exists, the conclusion must favor non-engagement.
+- Gray areas, workaround structures, indirect routes, or high-risk jurisdictions must be treated as non-compliant.
+- The analysis must prioritize avoiding sanctions exposure over commercial feasibility.
+
+Formatting rules:
+
+- No emojis.
+- No horizontal separators.
+- Use bold text only for section titles or subtitles.
+- Do not use bold inside paragraphs.
+- Use standard bullet points (•) only when necessary.
+- Focus primarily on conclusions and compliance implications.
+- Keep discussion of regulatory provisions concise and only to support the conclusion.
 
 Using ONLY the structured regulatory analysis below:
 
@@ -119,15 +135,16 @@ Using ONLY the structured regulatory analysis below:
 
 Now:
 
-1. Apply the regulatory provisions to the specific question.
-2. Provide a clear legal conclusion.
-3. State conditions or uncertainties.
-4. Cite the document sources explicitly.
-5. Do not invent permissions not supported by the analysis.
+1. Provide a concise compliance-focused conclusion.
+2. Explain whether the activity is clearly permitted, clearly prohibited, or legally uncertain.
+3. If uncertain or risky, conclude that the company should not proceed.
+4. Explicitly reference the relevant document sources.
+5. Do not speculate beyond the provided regulatory framework.
 
 Question:
 {data.question}
 """
+
 
     final_response = client.chat.completions.create(
         model="gpt-5.2-chat-latest",
