@@ -34,14 +34,17 @@ if collection.count() == 0:
     ids = []
 
     for i, chunk in enumerate(chunks):
-        documents.append(chunk["content"])
-        metadatas.append({
-            "source": chunk["source"],
-            "document_type": chunk.get("document_type"),
-            "status": chunk.get("status"),
-            "date": chunk.get("date")
-        })
-        ids.append(f"id_{i}")
+      documents.append(chunk["content"])
+
+      metadata = {
+        "filename": str(chunk.get("filename", "")),
+        "document_type": str(chunk.get("document_type", "")),
+        "date": str(chunk.get("date", "")),
+        "jurisdiction": str(chunk.get("jurisdiction", ""))
+      }
+
+      metadatas.append(metadata)
+      ids.append(f"id_{i}")
 
     collection.add(
         documents=documents,
