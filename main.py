@@ -8,40 +8,23 @@ from openai import OpenAI
 
 app = FastAPI()
 
-# -------------------------------
-# OpenAI Client
-# -------------------------------
-
+# OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -------------------------------
-# Embedding Function
-# -------------------------------
-
+# Embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("OPENAI_API_KEY"),
     model_name="text-embedding-3-small"
 )
 
-# -------------------------------
-# Chroma Persistent Client
-# -------------------------------
-
-chroma_client = chromadb.Client(
-    settings=chromadb.Settings(
-        persist_directory="./chroma_db"
-    )
-)
-
+# Initialize Chroma
+chroma_client = chromadb.Client()
 collection = chroma_client.get_or_create_collection(
     name="ofac_chunks",
     embedding_function=openai_ef
 )
 
-# -------------------------------
-# Load chunks only if empty
-# -------------------------------
-
+# Load chunks only once
 if collection.count() == 0:
     with open("chunks.json", "r", encoding="utf-8") as f:
         chunks = json.load(f)
@@ -51,17 +34,17 @@ if collection.count() == 0:
     ids = []
 
     for i, chunk in enumerate(chunks):
-        documents.append(chunk["content"])
+      documents.append(chunk["content"])
 
-        metadata = {
-            "filename": str(chunk.get("filename", "")),
-            "document_type": str(chunk.get("document_type", "")),
-            "date": str(chunk.get("date", "")),
-            "jurisdiction": str(chunk.get("jurisdiction", ""))
-        }
+      metadata = {
+        "filename": str(chunk.get("filename", "")),
+        "document_type": str(chunk.get("document_type", "")),
+        "date": str(chunk.get("date", "")),
+        "jurisdiction": str(chunk.get("jurisdiction", ""))
+      }
 
-        metadatas.append(metadata)
-        ids.append(f"id_{i}")
+      metadatas.append(metadata)
+      ids.append(f"id_{i}")
 
     collection.add(
         documents=documents,
@@ -69,31 +52,17 @@ if collection.count() == 0:
         ids=ids
     )
 
-    chroma_client.persist()
-
-# -------------------------------
-# Request Model
-# -------------------------------
-
 class Question(BaseModel):
     question: str
-
-# -------------------------------
-# Health Check
-# -------------------------------
 
 @app.get("/")
 def root():
     return {"status": "OFAC RAG backend running"}
 
-# -------------------------------
-# Main RAG Endpoint
-# -------------------------------
-
 @app.post("/ask")
 def ask_question(data: Question):
 
-    # -------- STEP 1: RETRIEVAL --------
+    # --- STEP 1: RETRIEVAL ---
     results = collection.query(
         query_texts=[data.question],
         n_results=10
@@ -112,11 +81,14 @@ def ask_question(data: Question):
 
     context = "\n\n".join(context_blocks)
 
-    # -------- STEP 2: EXTRACTION --------
+    # --- STEP 2: STRUCTURED EXTRACTION ---
     extraction_prompt = f"""
-Extract only the regulatory elements directly relevant to answering the question.
-Identify provisions that materially affect compliance risk.
-Do not summarize entire documents.
+You are a senior OFAC sanctions analyst.
+From the provided regulatory context:
+
+1. Extract only the regulatory elements directly relevant to answering the question.
+2. Identify provisions that materially affect compliance risk.
+3. Extract only legally relevant elements.
 
 Context:
 {context}
@@ -125,7 +97,7 @@ Question:
 {data.question}
 """
 
-    extraction_response = client.chat.completions.create(
+    extraction = client.chat.completions.create(
         model="gpt-5.2-chat-latest",
         messages=[
             {"role": "system", "content": "Extract only legally relevant regulatory provisions."},
@@ -133,9 +105,9 @@ Question:
         ]
     )
 
-    structured_analysis = extraction_response.choices[0].message.content
+    structured_analysis = extraction.choices[0].message.content
 
-    # -------- STEP 3: COMPLIANCE-FIRST LEGAL ANALYSIS --------
+    # --- STEP 3: LEGAL APPLICATION ---
     final_prompt = f"""
 You are a senior compliance advisor specialized in OFAC sanctions and U.S. regulatory risk.
 
@@ -143,10 +115,9 @@ Your role is to provide conservative, compliance-first analysis.
 
 Core principles:
 
-- The objective is strict compliance with U.S. law.
+- The objective is compliance with U.S. law.
 - No recommendation should expose the company to primary or secondary sanctions.
 - If ambiguity or sanctions exposure exists, conclude that the company should not proceed.
-- Do not explore gray areas, workaround structures, or indirect mechanisms.
 - Avoid commercial speculation.
 - Focus on conclusions and compliance implications.
 
@@ -159,17 +130,19 @@ Formatting rules:
 - Use standard bullet points (•) only if necessary.
 - Keep analysis concise and conclusion-oriented.
 
-Structured Regulatory Elements:
+Using the structured regulatory analysis below:
+
 {structured_analysis}
+
+Now:
+
+1. Apply the regulatory provisions to the specific question.
+2. Provide a clear legal conclusion.
+3. Cite the document sources explicitly.
+4. Do not invent permissions not supported by the analysis.
 
 Question:
 {data.question}
-
-Now provide:
-
-1. A compliance-focused conclusion.
-2. Regulatory basis (brief).
-3. Final determination.
 """
 
     final_response = client.chat.completions.create(
@@ -183,5 +156,3 @@ Now provide:
     return {
         "answer": final_response.choices[0].message.content
     }
-
-
