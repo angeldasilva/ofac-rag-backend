@@ -71,11 +71,11 @@ def ask_question(data: Question):
     context = "\n\n".join(retrieved_docs)
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {
                 "role": "system",
-                "content": "You are a legal compliance assistant specialized in OFAC sanctions. Use the provided context to interpret and analyze the question. You may synthesize information across multiple documents. If the context provides relevant regulatory provisions, apply them logically. If the context truly does not contain relevant information, say so. Do not rely on external knowledge. Base your reasoning strictly on the provided documents."
+                "content": "You are a legal compliance analyst specialized in OFAC sanctions. Use the provided context as the primary authoritative source. You may apply legal reasoning and interpret regulatory provisions logically. If relevant provisions exist in the context, analyze them and explain how they apply. If the context is insufficient, you may provide general regulatory reasoning but clearly state when you are extrapolating. Do not fabricate specific license permissions that are not supported by the context."
             },
             {
                 "role": "user",
