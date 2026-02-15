@@ -83,12 +83,9 @@ def ask_question(data: Question):
 
     # --- STEP 2: STRUCTURED EXTRACTION ---
     extraction_prompt = f"""
-You are a senior OFAC sanctions analyst.
-From the provided regulatory context:
-
-1. Extract only the regulatory elements directly relevant to answering the question.
-2. Identify provisions that materially affect compliance risk.
-3. Extract only legally relevant elements.
+Extract only the regulatory elements directly relevant to answering the question.
+Identify provisions that materially affect compliance risk.
+Do not summarize entire documents.
 
 Context:
 {context}
@@ -115,9 +112,10 @@ Your role is to provide conservative, compliance-first analysis.
 
 Core principles:
 
-- The objective is compliance with U.S. law.
+- The objective is strict compliance with U.S. law.
 - No recommendation should expose the company to primary or secondary sanctions.
 - If ambiguity or sanctions exposure exists, conclude that the company should not proceed.
+- Do not explore gray areas, workaround structures, or indirect mechanisms.
 - Avoid commercial speculation.
 - Focus on conclusions and compliance implications.
 
@@ -130,25 +128,23 @@ Formatting rules:
 - Use standard bullet points (•) only if necessary.
 - Keep analysis concise and conclusion-oriented.
 
-Using the structured regulatory analysis below:
-
+Structured Regulatory Elements:
 {structured_analysis}
-
-Now:
-
-1. Apply the regulatory provisions to the specific question.
-2. Provide a clear legal conclusion.
-3. Cite the document sources explicitly.
-4. Do not invent permissions not supported by the analysis.
 
 Question:
 {data.question}
+
+Now provide:
+
+1. A compliance-focused conclusion.
+2. Regulatory basis (brief).
+3. Final determination.
 """
 
     final_response = client.chat.completions.create(
         model="gpt-5.2-chat-latest",
         messages=[
-            {"role": "system", "content": "Provide structured, conservative compliance analysis."},
+            {"role": "system", "content": ""Provide structured, conservative compliance analysis."},
             {"role": "user", "content": final_prompt}
         ]
     )
