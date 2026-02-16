@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
@@ -8,11 +9,9 @@ from openai import OpenAI
 
 app = FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.angeldasilva.com"],  
+    allow_origins=["https://angeldasilva.com", "https://www.angeldasilva.com"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
