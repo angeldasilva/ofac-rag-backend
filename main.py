@@ -65,6 +65,7 @@ if collection.count() == 0:
 
 class Question(BaseModel):
     question: str
+    access_key: str
 
 @app.get("/")
 def root():
@@ -72,6 +73,10 @@ def root():
 
 @app.post("/ask")
 def ask_question(data: Question):
+
+    # ---- ACCESS CONTROL (MUST BE FIRST) ----
+    if data.access_key != os.getenv("ACCESS_KEY"):
+        return {"error": "Unauthorized"}
 
     # --- STEP 1: RETRIEVAL ---
     results = collection.query(
